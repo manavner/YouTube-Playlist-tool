@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>כלי רשימות YouTube — ייצוא ל-CSV</title>
+    <meta name="description" content="חפש רשימות השמעה ביוטיוב, בחר סרטונים וייצא לקובץ CSV עבור Google Sheets">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        /* ===== CSS VARIABLES ===== */
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --bg-card: rgba(30, 30, 55, 0.7);
+            --bg-card-hover: rgba(40, 40, 70, 0.8);
+            --bg-input: rgba(20, 20, 40, 0.8);
+            --accent-primary: #e63946;
+            --accent-secondary: #ff6b6b;
+            --accent-gradient: linear-gradient(135deg, #e63946, #ff6b6b);
+            --text-primary: #f0f0f5;
+            --text-secondary: #a0a0c0;
+            --text-muted: #6a6a8a;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-active: rgba(230, 57, 70, 0.5);
+            --shadow-glow: 0 0 30px rgba(230, 57, 70, 0.15);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --font: 'Heebo', sans-serif;
+        }
+
+        /* ===== RESET & BASE ===== */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 20%, rgba(230, 57, 70, 0.06) 0%, transparent 50%),
+                radial-gradient(circle at 70% 80%, rgba(255, 107, 107, 0.04) 0%, transparent 50%);
+            z-index: -1;
+            animation: bgShift 20s ease-in-out infinite alternate;
+        }
+
+        @keyframes bgShift {
+            0% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+
+            100% {
+                transform: translate(-5%, 5%) rotate(3deg);
+            }
+        }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-primary);
+        }
+
+        /* ===== LAYOUT ===== */
+        .app-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 30px 20px 60px;
+        }
+
+        /* ===== HEADER ===== */
+        .app-header {
+            text-align: center;
+            margin-bottom: 36px;
+            animation: fadeInDown 0.6s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .app-header h1 {
+            font-size: 2.4rem;
+            font-weight: 800;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .app-header .yt-icon {
+            display: inline-block;
+            width: 42px;
+            height: 30px;
+            background: var(--accent-primary);
+            border-radius: 8px;
+            position: relative;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+
+        .app-header .yt-icon::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 55%;
+            transform: translate(-50%, -50%);
+            width: 0;
+            height: 0;
+            border-top: 7px solid transparent;
+            border-bottom: 7px solid transparent;
+            border-right: 12px solid white;
+        }
+
+        .app-header p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            font-weight: 300;
+        }
+
+        /* ===== API KEY SECTION ===== */
+        .api-key-section {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            animation: fadeIn 0.5s ease-out 0.1s both;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .api-key-section .section-title {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .api-key-section .section-title .key-icon {
+            font-size: 1rem;
+        }
+
+        .api-key-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .api-key-row input {
+            flex: 1;
+        }
+
+        .api-help-link {
+            display: inline-block;
+            margin-top: 8px;
+            font-size: 0.8rem;
+            color: var(--accent-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .api-help-link:hover {
+            color: var(--accent-primary);
+            text-decoration: underline;
+        }
+
+        /* ===== INPUTS ===== */
+        input[type="text"],
+        input[type="password"] {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            padding: 12px 16px;
+            font-family: var(--font);
+            font-size: 0.95rem;
+            width: 100%;
+            transition: var(--transition);
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--border-active);
+            box-shadow: 0 0 0 3px rgba(230, 57, 70, 0.1);
+        }
+
+        input::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* ===== BUTTONS ===== */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--accent-gradient);
+            color: white;
+            box-shadow: 0 4px 15px rgba(230, 57, 70, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 25px rgba(230, 57, 70, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.85rem;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn-save {
+            background: rgba(76, 175, 80, 0.2);
+            color: #81c784;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .btn-save:hover {
+            background: rgba(76, 175, 80, 0.3);
+        }
+
+        /* ===== TABS ===== */
+        .tabs-container {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            margin-bottom: 24px;
+            animation: fadeIn 0.5s ease-out 0.2s both;
+        }
+
+        .tabs-header {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 16px 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-family: var(--font);
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .tab-btn::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--accent-gradient);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .tab-btn.active {
+            color: var(--text-primary);
+            background: rgba(230, 57, 70, 0.05);
+        }
+
+        .tab-btn.active::after {
+            transform: scaleX(1);
+        }
+
+        .tab-btn:hover:not(.active) {
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .tab-content {
+            padding: 24px;
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .search-row input {
+            flex: 1;
+        }
+
+        /* ===== RESULTS ===== */
+        .results-section {
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .results-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .results-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .results-count {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .results-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* ===== PLAYLIST CARDS ===== */
+        .playlist-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .playlist-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 14px 18px;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .playlist-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-active);
+            transform: translateX(4px);
+        }
+
+        .playlist-card img {
+            width: 120px;
+            height: 68px;
+            object-fit: cover;
+            border-radius: var(--radius-sm);
+            flex-shrink: 0;
+        }
+
+        .playlist-card-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .playlist-card-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .playlist-card-channel {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .playlist-card-count {
+            font-size: 0.75rem;
+            color: var(--accent-secondary);
+            margin-top: 2px;
+        }
+
+        /* ===== VIDEO LIST ===== */
+        .video-list-container {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            margin-top: 20px;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .video-list-header {
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .video-list-header-right {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .video-list {
+            max-height: 60vh;
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+
+        .video-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 24px;
+            transition: var(--transition);
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .video-item:last-child {
+            border-bottom: none;
+        }
+
+        .video-item:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .video-item.selected {
+            background: rgba(230, 57, 70, 0.06);
+        }
+
+        .video-item input[type="checkbox"] {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--text-muted);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: var(--transition);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .video-item input[type="checkbox"]:checked {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .video-item input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .video-thumb {
+            width: 100px;
+            height: 56px;
+            object-fit: cover;
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+
+        .video-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .video-title {
+            font-weight: 500;
+            font-size: 0.9rem;
+            margin-bottom: 3px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .video-channel {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .video-index {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            width: 28px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        /* ===== BACK BUTTON ===== */
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+            background: none;
+            border: none;
+            font-family: var(--font);
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin-bottom: 16px;
+            transition: var(--transition);
+        }
+
+        .back-btn:hover {
+            color: var(--accent-secondary);
+        }
+
+        /* ===== LOADING ===== */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 50px 20px;
+            gap: 16px;
+        }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* ===== EMPTY STATE ===== */
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-active);
+            padding: 14px 28px;
+            border-radius: var(--radius-md);
+            font-family: var(--font);
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            box-shadow: var(--shadow-glow);
+            z-index: 1000;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ===== ERROR ===== */
+        .error-msg {
+            background: rgba(230, 57, 70, 0.1);
+            border: 1px solid rgba(230, 57, 70, 0.3);
+            border-radius: var(--radius-sm);
+            padding: 12px 18px;
+            color: var(--accent-secondary);
+            font-size: 0.9rem;
+            margin-top: 12px;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 600px) {
+            .app-header h1 {
+                font-size: 1.7rem;
+            }
+
+            .playlist-card {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .playlist-card img {
+                width: 100%;
+                height: auto;
+            }
+
+            .video-thumb {
+                width: 72px;
+                height: 40px;
+            }
+
+            .video-item {
+                padding: 10px 16px;
+            }
+
+            .video-list-header {
+                padding: 14px 16px;
+            }
+
+            .search-row {
+                flex-direction: column;
+            }
+
+            .api-key-row {
+                flex-direction: column;
+            }
+
+            .app-container {
+                padding: 20px 12px 40px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- HEADER -->
+        <header class="app-header">
+            <h1><span class="yt-icon"></span> כלי רשימות YouTube</h1>
+            <p>חפש רשימות השמעה, בחר סרטונים וייצא ל-CSV עבור Google Sheets</p>
+        </header>
+
+        <!-- API KEY -->
+        <section class="api-key-section" id="apiKeySection">
+            <div class="section-title">
+                <span class="key-icon">🔑</span>
+                מפתח YouTube Data API
+            </div>
+            <!-- Saved state: shown when key exists -->
+            <div id="apiKeySavedState" style="display:none;">
+                <div class="api-key-row" style="align-items:center;">
+                    <span style="color: #81c784; font-size: 0.9rem;">✓ מפתח API שמור ופעיל</span>
+                    <button class="btn btn-secondary btn-sm" id="changeApiKeyBtn">החלף מפתח</button>
+                </div>
+            </div>
+            <!-- Input state: shown when no key or user wants to change -->
+            <div id="apiKeyInputState">
+                <div class="api-key-row">
+                    <input type="password" id="apiKeyInput" placeholder="הדבק כאן את מפתח ה-API שלך...">
+                    <button class="btn btn-save btn-sm" id="saveApiKeyBtn">שמור</button>
+                </div>
+                <a class="api-help-link" href="https://console.cloud.google.com/apis/credentials" target="_blank"
+                    rel="noopener">
+                    איך להשיג מפתח API חינם? →
+                </a>
+            </div>
+        </section>
+
+        <!-- TABS -->
+        <div class="tabs-container">
+            <div class="tabs-header">
+                <button class="tab-btn active" id="tabSearch" data-tab="search">🔍 חיפוש רשימה</button>
+                <button class="tab-btn" id="tabUrl" data-tab="url">🔗 הדבקת כתובת URL</button>
+            </div>
+
+            <!-- Search Tab -->
+            <div class="tab-content active" id="searchTab">
+                <div class="search-row">
+                    <input type="text" id="searchInput" placeholder="חפש שם אומן או רשימת השמעה...">
+                    <button class="btn btn-primary" id="searchBtn">חפש</button>
+                </div>
+                <div id="searchResults"></div>
+            </div>
+
+            <!-- URL Tab -->
+            <div class="tab-content" id="urlTab">
+                <div class="search-row">
+                    <input type="text" id="urlInput" placeholder="הדבק כתובת URL של רשימת השמעה מיוטיוב...">
+                    <button class="btn btn-primary" id="loadUrlBtn">טען רשימה</button>
+                </div>
+                <div id="urlResults"></div>
+            </div>
+        </div>
+
+        <!-- Video List (shown after selecting a playlist) -->
+        <div id="videoSection" style="display:none;"></div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ===== STATE =====
+        const state = {
+            apiKey: localStorage.getItem('yt_api_key') || '',
+            videos: [],
+            selectedIds: new Set(),
+            currentPlaylistTitle: ''
+        };
+
+        // ===== DOM REFS =====
+        const $ = id => document.getElementById(id);
+        const apiKeyInput = $('apiKeyInput');
+        const saveApiKeyBtn = $('saveApiKeyBtn');
+        const searchInput = $('searchInput');
+        const searchBtn = $('searchBtn');
+        const urlInput = $('urlInput');
+        const loadUrlBtn = $('loadUrlBtn');
+        const searchResults = $('searchResults');
+        const urlResults = $('urlResults');
+        const videoSection = $('videoSection');
+        const toast = $('toast');
+
+        // ===== DOM REFS (API Key states) =====
+        const apiKeySavedState = $('apiKeySavedState');
+        const apiKeyInputState = $('apiKeyInputState');
+        const changeApiKeyBtn = $('changeApiKeyBtn');
+
+        // ===== INIT =====
+        function updateApiKeyUI() {
+            if (state.apiKey) {
+                apiKeySavedState.style.display = 'block';
+                apiKeyInputState.style.display = 'none';
+            } else {
+                apiKeySavedState.style.display = 'none';
+                apiKeyInputState.style.display = 'block';
+            }
+        }
+        updateApiKeyUI();
+
+        // ===== API KEY =====
+        saveApiKeyBtn.addEventListener('click', () => {
+            const key = apiKeyInput.value.trim();
+            if (!key) return showToast('נא להזין מפתח API');
+            state.apiKey = key;
+            localStorage.setItem('yt_api_key', key);
+            showToast('מפתח API נשמר בהצלחה ✓');
+            updateApiKeyUI();
+        });
+
+        changeApiKeyBtn.addEventListener('click', () => {
+            apiKeySavedState.style.display = 'none';
+            apiKeyInputState.style.display = 'block';
+            apiKeyInput.value = state.apiKey;
+            apiKeyInput.focus();
+        });
+
+        // ===== TABS =====
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                const tabId = btn.dataset.tab === 'search' ? 'searchTab' : 'urlTab';
+                $(tabId).classList.add('active');
+            });
+        });
+
+        // ===== HELPER: YouTube API FETCH =====
+        async function ytFetch(endpoint, params) {
+            if (!state.apiKey) {
+                throw new Error('נא להכניס מפתח API תחילה');
+            }
+            const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
+            params.key = state.apiKey;
+            Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+
+            const res = await fetch(url.toString());
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                const msg = err?.error?.message || `שגיאה ${res.status}`;
+                throw new Error(msg);
+            }
+            return res.json();
+        }
+
+        // ===== SEARCH PLAYLISTS =====
+        searchBtn.addEventListener('click', searchPlaylists);
+        searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchPlaylists(); });
+
+        async function searchPlaylists() {
+            const query = searchInput.value.trim();
+            if (!query) return showToast('נא להקליד מילות חיפוש');
+
+            searchResults.innerHTML = loadingHTML('מחפש רשימות...');
+            videoSection.style.display = 'none';
+
+            try {
+                const data = await ytFetch('search', {
+                    part: 'snippet',
+                    type: 'playlist',
+                    q: query,
+                    maxResults: '15'
+                });
+
+                if (!data.items?.length) {
+                    searchResults.innerHTML = emptyHTML('לא נמצאו רשימות');
+                    return;
+                }
+
+                // Get item counts
+                const playlistIds = data.items.map(i => i.id.playlistId).join(',');
+                let countsMap = {};
+                try {
+                    const details = await ytFetch('playlists', {
+                        part: 'contentDetails,snippet',
+                        id: playlistIds
+                    });
+                    details.items.forEach(p => {
+                        countsMap[p.id] = p.contentDetails.itemCount;
+                    });
+                } catch (e) { /* ignore */ }
+
+                searchResults.innerHTML = `
+                    <div class="playlist-list">
+                        ${data.items.map(item => {
+                    const id = item.id.playlistId;
+                    const title = escapeHtml(item.snippet.title);
+                    const channel = escapeHtml(item.snippet.channelTitle);
+                    const thumb = item.snippet.thumbnails?.medium?.url ||
+                        item.snippet.thumbnails?.default?.url || '';
+                    const count = countsMap[id] !== undefined ? `${countsMap[id]} סרטונים` : '';
+                    return `
+                                <div class="playlist-card" data-id="${id}" data-title="${title}" onclick="loadPlaylist('${id}', '${title.replace(/'/g, "\\'")}', 'searchResults')">
+                                    <img src="${thumb}" alt="${title}" loading="lazy">
+                                    <div class="playlist-card-info">
+                                        <div class="playlist-card-title">${title}</div>
+                                        <div class="playlist-card-channel">${channel}</div>
+                                        <div class="playlist-card-count">${count}</div>
+                                    </div>
+                                </div>
+                            `;
+                }).join('')}
+                    </div>
+                `;
+            } catch (err) {
+                searchResults.innerHTML = errorHTML(err.message);
+            }
+        }
+
+        // ===== LOAD PLAYLIST BY URL =====
+        loadUrlBtn.addEventListener('click', loadFromUrl);
+        urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') loadFromUrl(); });
+
+        function loadFromUrl() {
+            const url = urlInput.value.trim();
+            const playlistId = extractPlaylistId(url);
+            if (!playlistId) {
+                showToast('כתובת URL לא תקינה. נא להדביק כתובת של רשימת השמעה מיוטיוב');
+                return;
+            }
+            loadPlaylist(playlistId, 'רשימה מ-URL', 'urlResults');
+        }
+
+        function extractPlaylistId(url) {
+            try {
+                const u = new URL(url);
+                return u.searchParams.get('list');
+            } catch {
+                // Maybe just the ID
+                if (/^PL[A-Za-z0-9_-]{10,}$/.test(url)) return url;
+                return null;
+            }
+        }
+
+        // ===== LOAD PLAYLIST ITEMS =====
+        async function loadPlaylist(playlistId, title, parentContainerId) {
+            state.currentPlaylistTitle = title;
+            state.videos = [];
+            state.selectedIds.clear();
+
+            videoSection.style.display = 'block';
+            videoSection.innerHTML = loadingHTML('טוען סרטונים...');
+
+            try {
+                let allItems = [];
+                let nextPageToken = '';
+
+                // Paginate through all items (max 200)
+                do {
+                    const params = {
+                        part: 'snippet',
+                        playlistId: playlistId,
+                        maxResults: '50'
+                    };
+                    if (nextPageToken) params.pageToken = nextPageToken;
+
+                    const data = await ytFetch('playlistItems', params);
+                    allItems = allItems.concat(data.items || []);
+                    nextPageToken = data.nextPageToken || '';
+                } while (nextPageToken && allItems.length < 200);
+
+                if (!allItems.length) {
+                    videoSection.innerHTML = emptyHTML('הרשימה ריקה');
+                    return;
+                }
+
+                state.videos = allItems.map((item, idx) => ({
+                    index: idx + 1,
+                    id: item.snippet?.resourceId?.videoId || '',
+                    title: item.snippet?.title || 'ללא כותרת',
+                    channel: item.snippet?.videoOwnerChannelTitle || item.snippet?.channelTitle || '',
+                    thumb: item.snippet?.thumbnails?.medium?.url ||
+                        item.snippet?.thumbnails?.default?.url || '',
+                })).filter(v => v.title !== 'Private video' && v.title !== 'Deleted video');
+
+                // Select all by default
+                state.videos.forEach(v => state.selectedIds.add(v.id));
+
+                renderVideoList();
+            } catch (err) {
+                videoSection.innerHTML = errorHTML(err.message);
+            }
+        }
+
+        // ===== RENDER VIDEO LIST =====
+        function renderVideoList() {
+            const selectedCount = state.selectedIds.size;
+            const totalCount = state.videos.length;
+
+            videoSection.innerHTML = `
+                <button class="back-btn" onclick="videoSection.style.display='none'">
+                    → חזרה לתוצאות
+                </button>
+                <div class="video-list-container">
+                    <div class="video-list-header">
+                        <div>
+                            <div class="results-title">${escapeHtml(state.currentPlaylistTitle)}</div>
+                            <div class="results-count">${selectedCount} מתוך ${totalCount} סרטונים נבחרו</div>
+                        </div>
+                        <div class="video-list-header-right">
+                            <button class="btn btn-secondary btn-sm" onclick="toggleAll(true)">בחר הכל</button>
+                            <button class="btn btn-secondary btn-sm" onclick="toggleAll(false)">בטל הכל</button>
+                            <button class="btn btn-primary btn-sm" onclick="exportCSV()" ${selectedCount === 0 ? 'disabled' : ''}>
+                                📥 ייצא ל-CSV
+                            </button>
+                        </div>
+                    </div>
+                    <div class="video-list">
+                        ${state.videos.map(v => `
+                            <div class="video-item ${state.selectedIds.has(v.id) ? 'selected' : ''}"
+                                 onclick="toggleVideo('${v.id}')">
+                                <span class="video-index">${v.index}</span>
+                                <input type="checkbox" ${state.selectedIds.has(v.id) ? 'checked' : ''}
+                                       onclick="event.stopPropagation(); toggleVideo('${v.id}')">
+                                <img class="video-thumb" src="${v.thumb}" alt="" loading="lazy">
+                                <div class="video-info">
+                                    <div class="video-title">${escapeHtml(v.title)}</div>
+                                    <div class="video-channel">${escapeHtml(v.channel)}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ===== TOGGLE VIDEO SELECTION =====
+        function toggleVideo(id) {
+            if (state.selectedIds.has(id)) {
+                state.selectedIds.delete(id);
+            } else {
+                state.selectedIds.add(id);
+            }
+            renderVideoList();
+        }
+
+        function toggleAll(selectAll) {
+            if (selectAll) {
+                state.videos.forEach(v => state.selectedIds.add(v.id));
+            } else {
+                state.selectedIds.clear();
+            }
+            renderVideoList();
+        }
+
+        // ===== EXPORT CSV =====
+        function exportCSV() {
+            const selected = state.videos.filter(v => state.selectedIds.has(v.id));
+            if (!selected.length) {
+                showToast('נא לבחור לפחות סרטון אחד');
+                return;
+            }
+
+            // CSV with UTF-8 BOM for Hebrew support
+            const BOM = '\uFEFF';
+            const headers = ['מספר', 'שם הסרטון', 'שם הערוץ', 'קישור YouTube'];
+            const rows = selected.map(v => [
+                v.index,
+                csvEscape(v.title),
+                csvEscape(v.channel),
+                `https://www.youtube.com/watch?v=${v.id}`
+            ]);
+
+            const csv = BOM + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            const safeTitle = state.currentPlaylistTitle.replace(/[^\w\u0590-\u05FF\s-]/g, '').trim() || 'youtube_playlist';
+            a.download = `${safeTitle}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast(`✓ הקובץ יורד — ${selected.length} סרטונים`);
+        }
+
+        function csvEscape(str) {
+            if (!str) return '""';
+            str = str.replace(/"/g, '""');
+            return `"${str}"`;
+        }
+
+        // ===== UTILITIES =====
+        function escapeHtml(text) {
+            const d = document.createElement('div');
+            d.textContent = text;
+            return d.innerHTML;
+        }
+
+        function showToast(msg) {
+            toast.textContent = msg;
+            toast.classList.add('show');
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function loadingHTML(text) {
+            return `<div class="loading"><div class="spinner"></div><div class="loading-text">${text}</div></div>`;
+        }
+
+        function emptyHTML(text) {
+            return `<div class="empty-state"><div class="empty-icon">📭</div><div>${text}</div></div>`;
+        }
+
+        function errorHTML(text) {
+            return `<div class="error-msg">⚠️ ${escapeHtml(text)}</div>`;
+        }
+    </script>
+</body>
+
+</html>
