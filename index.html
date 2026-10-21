@@ -740,7 +740,7 @@
         </header>
 
         <!-- API KEY -->
-        <section class="api-key-section" id="apiKeySection">
+        <section class="api-key-section" id="apiKeySection" style="display:none;">
             <div class="section-title">
                 <span class="key-icon">🔑</span>
                 מפתח YouTube Data API
@@ -865,13 +865,34 @@
             });
         });
 
+        // ===== SERVER KEY (Vercel /api/yt) =====
+        // When the site's server has a key, visitors don't need their own.
+        let serverReady = false;
+        const serverCheck = fetch('/api/yt?endpoint=status')
+            .then(r => r.ok ? r.json() : { configured: false })
+            .then(d => {
+                serverReady = d.configured === true;
+            })
+            .catch(() => { serverReady = false; })
+            .finally(() => {
+                // Show the personal-key box only when the server can't help
+                if (!serverReady) $('apiKeySection').style.display = '';
+            });
+
         // ===== HELPER: YouTube API FETCH =====
         async function ytFetch(endpoint, params) {
-            if (!state.apiKey) {
-                throw new Error('נא להכניס מפתח API תחילה');
+            await serverCheck;
+            let url;
+            if (serverReady) {
+                url = new URL('/api/yt', location.origin);
+                url.searchParams.set('endpoint', endpoint);
+            } else {
+                if (!state.apiKey) {
+                    throw new Error('נא להכניס מפתח API תחילה');
+                }
+                url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
+                params.key = state.apiKey;
             }
-            const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
-            params.key = state.apiKey;
             Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
             const res = await fetch(url.toString());
